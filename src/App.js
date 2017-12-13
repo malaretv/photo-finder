@@ -64,19 +64,24 @@ const readFileAsBuffer = (file, bytes) =>
     display: flex;
   `;
 
-  const Error = styled.div`
+  const Errors = styled.div`
     position: absolute;
     top: 10px;
     left: 0;
     right: 0;
-    width: 200px;
-    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    height: 80%;
+  `;
+
+  const Error = styled.div`
     background: white;
     color: palevioletred;
     padding: 0.25em 1em;
-    z-index: 2;
     font-weight: bold;
     text-align: center;
+    z-index: 2;
   `;
   const FileInputLabel = styled.label`
     border-radius: 3px;
@@ -92,25 +97,28 @@ const readFileAsBuffer = (file, bytes) =>
     bottom: 70px;
     left: 0;
     right: 0;
-    z-index: 2;
+    z-index: 3;
   `;
   const FileInput = styled.input`
     display: none;
   `;
 
 class App extends Component {
-  state = {};
-  setImageError = error => this.setState({ error });
-  clearError = () => this.setState({ error: null });
-  handleImageLoad = async evt => {
-    this.clearError();
-    const file = this.FileInput.files[0];
+  state = {
+    errors: []
+  };
+  setImageError = error => this.setState({
+    errors: this.state.errors.concat(error)
+  });
+  clearErrors = () => this.setState({ errors: [] });
+  loadImage = async (file) => {
     if (!file) return this.setImageError("Not a valid file");
+    console.log(file);
     try {
       const buffer = await readFileAsBuffer(file, EXIF_HEADER_MAX_BYTES);
       const exifData = EXIF.readFromBinaryFile(buffer);
       if (!exifData || !exifData.GPSLongitude || !exifData.GPSLatitude) {
-        return this.setImageError("No Geolocation data present.");
+        return this.setImageError(`${file.name}: No Geolocation data present.`);
       }
       const longitude = convertDMStoDD(
         ...exifData.GPSLongitude,
@@ -131,7 +139,14 @@ class App extends Component {
         this.map.getView().animate({ zoom: 14, center: projectedCoords });
       }
     } catch (e) {
-      return this.setImageError("Error reading EXIF data");
+      return this.setImageError(`${file.name}: Error reading EXIF data`);
+    }
+  }
+  handleImageLoad = evt => {
+    this.clearErrors();
+    const { files } = this.FileInput;
+    for (var i = 0; i < files.length; i++) {
+      this.loadImage(files[i]);
     }
   };
   initializeGeolocation() {
@@ -183,15 +198,18 @@ class App extends Component {
     this.initializeGeolocation();
   }
   render() {
-    const { error } = this.state;
+    const { errors } = this.state;
     return (
       <Map id="map">
-        {error && <Error>{error}</Error>}
+        <Errors>
+          {errors && !!errors.length && errors.map(error => <Error>{error}</Error>)}
+        </Errors>
         <FileInputLabel>
-          Locate My Photo!
+          Locate Photos!
           <FileInput
             type="file"
             accept="image/*"
+            multiple="multiple"
             onChange={this.handleImageLoad}
             innerRef={el => (this.FileInput = el)}
           />
